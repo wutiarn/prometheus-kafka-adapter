@@ -48,7 +48,7 @@ var (
 	kafkaSaslMechanism             = ""
 	kafkaSaslUsername              = ""
 	kafkaSaslPassword              = ""
-	kafkaProducerTimeout           = 60 * time.Second
+	producerTimeout                = 60 * time.Second
 	serializer                     Serializer
 )
 
@@ -133,12 +133,12 @@ func init() {
 		kafkaSaslPassword = value
 	}
 
-	if value := os.Getenv("KAFKA_PRODUCER_TIMEOUT"); value != "" {
+	if value := os.Getenv("PRODUCER_TIMEOUT"); value != "" {
 		parsedDuration, err := time.ParseDuration(value)
 		if err != nil {
-			logrus.Fatalf("failed to parse KAFKA_PRODUCER_TIMEOUT env: %s", err)
+			logrus.Fatalf("failed to parse PRODUCER_TIMEOUT env: %s", err)
 		}
-		kafkaProducerTimeout = parsedDuration
+		producerTimeout = parsedDuration
 	}
 
 	if value := os.Getenv("MATCH"); value != "" {
