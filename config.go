@@ -20,31 +20,36 @@ import (
 	"github.com/prometheus/common/expfmt"
 	"gopkg.in/yaml.v2"
 	"os"
+	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
 
 var (
-	kafkaBrokerList        = "kafka:9092"
-	kafkaTopic             = "metrics"
-	topicTemplate          *template.Template
-	match                  = make(map[string]*dto.MetricFamily, 0)
-	basicauth              = false
-	basicauthUsername      = ""
-	basicauthPassword      = ""
-	kafkaCompression       = "none"
-	kafkaBatchNumMessages  = "10000"
-	kafkaSslClientCertFile = ""
-	kafkaSslClientKeyFile  = ""
-	kafkaSslClientKeyPass  = ""
-	kafkaSslCACertFile     = ""
-	kafkaSecurityProtocol  = ""
-	kafkaSaslMechanism     = ""
-	kafkaSaslUsername      = ""
-	kafkaSaslPassword      = ""
-	serializer             Serializer
+	kafkaBrokerList                = "kafka:9092"
+	kafkaTopic                     = "metrics"
+	topicTemplate                  *template.Template
+	match                          = make(map[string]*dto.MetricFamily, 0)
+	basicauth                      = false
+	basicauthUsername              = ""
+	basicauthPassword              = ""
+	kafkaCompression               = "none"
+	kafkaBatchNumMessages          = "10000"
+	kafkaQueueBufferingMaxMessages = 100000
+	kafkaQueueBufferingMaxKBytes   = 1048576
+	kafkaSslClientCertFile         = ""
+	kafkaSslClientKeyFile          = ""
+	kafkaSslClientKeyPass          = ""
+	kafkaSslCACertFile             = ""
+	kafkaSecurityProtocol          = ""
+	kafkaSaslMechanism             = ""
+	kafkaSaslUsername              = ""
+	kafkaSaslPassword              = ""
+	producerTimeout                = 60 * time.Second
+	serializer                     Serializer
 )
 
 func init() {
@@ -80,6 +85,22 @@ func init() {
 		kafkaBatchNumMessages = value
 	}
 
+	if value := os.Getenv("KAFKA_QUEUE_BUFFERING_MAX_MESSAGES"); value != "" {
+		parsed, err := strconv.Atoi(value)
+		if err != nil {
+			logrus.Fatalf("failed to parse KAFKA_QUEUE_BUFFERING_MAX_MESSAGES env: %s", err)
+		}
+		kafkaQueueBufferingMaxMessages = parsed
+	}
+
+	if value := os.Getenv("KAFKA_QUEUE_BUFFERING_MAX_KBYTES"); value != "" {
+		parsed, err := strconv.Atoi(value)
+		if err != nil {
+			logrus.Fatalf("failed to parse KAFKA_QUEUE_BUFFERING_MAX_KBYTES env: %s", err)
+		}
+		kafkaQueueBufferingMaxKBytes = parsed
+	}
+
 	if value := os.Getenv("KAFKA_SSL_CLIENT_CERT_FILE"); value != "" {
 		kafkaSslClientCertFile = value
 	}
@@ -110,6 +131,14 @@ func init() {
 
 	if value := os.Getenv("KAFKA_SASL_PASSWORD"); value != "" {
 		kafkaSaslPassword = value
+	}
+
+	if value := os.Getenv("PRODUCER_TIMEOUT"); value != "" {
+		parsedDuration, err := time.ParseDuration(value)
+		if err != nil {
+			logrus.Fatalf("failed to parse PRODUCER_TIMEOUT env: %s", err)
+		}
+		producerTimeout = parsedDuration
 	}
 
 	if value := os.Getenv("MATCH"); value != "" {

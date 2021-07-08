@@ -15,8 +15,11 @@
 package main
 
 import (
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -28,7 +31,15 @@ import (
 	"github.com/prometheus/prometheus/prompb"
 )
 
-func receiveHandler(producer *kafka.Producer, serializer Serializer) func(c *gin.Context) {
+var sentEventsCounter = promauto.NewCounter(prometheus.CounterOpts{
+	Name: "prometheus_kafka_adapter_events_sent_total",
+	Help: "The total number of events sent to kafka",
+})
+
+func receiveHandler(
+	producer *kafka.Producer,
+	serializer Serializer,
+) func(c *gin.Context) {
 	return func(c *gin.Context) {
 
 		httpRequestsTotal.Add(float64(1))
@@ -61,6 +72,9 @@ func receiveHandler(producer *kafka.Producer, serializer Serializer) func(c *gin
 			return
 		}
 
+		producerDeliveryReportsChan := make(chan kafka.Event)
+		sentMessagesCount := 0
+
 		for topic, metrics := range metricsPerTopic {
 			t := topic
 			part := kafka.TopicPartition{
@@ -71,15 +85,31 @@ func receiveHandler(producer *kafka.Producer, serializer Serializer) func(c *gin
 				err := producer.Produce(&kafka.Message{
 					TopicPartition: part,
 					Value:          metric,
-				}, nil)
+				}, producerDeliveryReportsChan)
 
 				if err != nil {
 					c.AbortWithStatus(http.StatusInternalServerError)
 					logrus.WithError(err).Error("couldn't produce message in kafka")
 					return
 				}
+				sentMessagesCount++
 			}
 		}
 
+		// Wait for all messages to be actually sent, preventing librdkafka's local queue overflow
+		timeoutChan := time.After(producerTimeout)
+		for i := 0; i < sentMessagesCount; {
+			select {
+			case <-producerDeliveryReportsChan:
+				i++
+				sentEventsCounter.Inc()
+			case <-timeoutChan:
+				// Note that producerDeliveryReportsChan must remain open: otherwise next delivery report will cause
+				// unhandled panic (and consequent process termination). Eventually it will be garbage collected.
+				c.AbortWithStatus(http.StatusInternalServerError)
+				logrus.WithError(err).Error("Kafka message producer timed out")
+				return
+			}
+		}
 	}
 }
