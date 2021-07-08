@@ -61,6 +61,10 @@ func receiveHandler(producer *kafka.Producer, serializer Serializer) func(c *gin
 			return
 		}
 
+		producerDeliveryReportsChan := make(chan kafka.Event)
+		defer close(producerDeliveryReportsChan)
+		sentMessagesCount := 0
+
 		for topic, metrics := range metricsPerTopic {
 			t := topic
 			part := kafka.TopicPartition{
@@ -71,15 +75,20 @@ func receiveHandler(producer *kafka.Producer, serializer Serializer) func(c *gin
 				err := producer.Produce(&kafka.Message{
 					TopicPartition: part,
 					Value:          metric,
-				}, nil)
+				}, producerDeliveryReportsChan)
 
 				if err != nil {
 					c.AbortWithStatus(http.StatusInternalServerError)
 					logrus.WithError(err).Error("couldn't produce message in kafka")
 					return
 				}
+				sentMessagesCount++
 			}
 		}
 
+		// Wait for all messages to be actually sent, preventing local queue from filling up
+		for i := 0; i < sentMessagesCount; i++ {
+			_ = <-producerDeliveryReportsChan
+		}
 	}
 }
