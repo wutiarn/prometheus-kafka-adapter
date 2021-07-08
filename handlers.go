@@ -29,7 +29,10 @@ import (
 	"github.com/prometheus/prometheus/prompb"
 )
 
-func receiveHandler(producer *kafka.Producer, serializer Serializer) func(c *gin.Context) {
+func receiveHandler(
+	producer *kafka.Producer,
+	serializer Serializer,
+) func(c *gin.Context) {
 	return func(c *gin.Context) {
 
 		httpRequestsTotal.Add(float64(1))
@@ -86,7 +89,7 @@ func receiveHandler(producer *kafka.Producer, serializer Serializer) func(c *gin
 			}
 		}
 
-		timeoutChan := time.After(1 * time.Second)
+		timeoutChan := time.After(kafkaProducerTimeout)
 		for i := 0; i < sentMessagesCount; {
 			select {
 			case <-producerDeliveryReportsChan:
