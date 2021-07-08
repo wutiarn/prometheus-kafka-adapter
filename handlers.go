@@ -89,7 +89,8 @@ func receiveHandler(
 			}
 		}
 
-		timeoutChan := time.After(kafkaProducerTimeout)
+		// Wait for all messages to be actually sent, preventing librdkafka's local queue overflow
+		timeoutChan := time.After(producerTimeout)
 		for i := 0; i < sentMessagesCount; {
 			select {
 			case <-producerDeliveryReportsChan:
