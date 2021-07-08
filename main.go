@@ -29,10 +29,12 @@ func main() {
 	log.Info("creating kafka producer")
 
 	kafkaConfig := kafka.ConfigMap{
-		"bootstrap.servers":   kafkaBrokerList,
-		"compression.codec":   kafkaCompression,
-		"batch.num.messages":  kafkaBatchNumMessages,
-		"go.delivery.reports": false, // per-message delivery reports to the Events() channel
+		"bootstrap.servers":            kafkaBrokerList,
+		"compression.codec":            kafkaCompression,
+		"batch.num.messages":           kafkaBatchNumMessages,
+		"go.delivery.reports":          false, // per-message delivery reports to the Events() channel
+		"queue.buffering.max.messages": kafkaQueueBufferingMaxMessages,
+		"queue.buffering.max.kbytes":   kafkaQueueBufferingMaxKBytes,
 	}
 
 	if kafkaSslClientCertFile != "" && kafkaSslClientKeyFile != "" && kafkaSslCACertFile != "" {
