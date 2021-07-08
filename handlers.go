@@ -17,6 +17,7 @@ package main
 import (
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -62,7 +63,6 @@ func receiveHandler(producer *kafka.Producer, serializer Serializer) func(c *gin
 		}
 
 		producerDeliveryReportsChan := make(chan kafka.Event)
-		defer close(producerDeliveryReportsChan)
 		sentMessagesCount := 0
 
 		for topic, metrics := range metricsPerTopic {
@@ -86,9 +86,18 @@ func receiveHandler(producer *kafka.Producer, serializer Serializer) func(c *gin
 			}
 		}
 
-		// Wait for all messages to be actually sent, preventing local queue from filling up
-		for i := 0; i < sentMessagesCount; i++ {
-			_ = <-producerDeliveryReportsChan
+		timeoutChan := time.After(1 * time.Second)
+		for i := 0; i < sentMessagesCount; {
+			select {
+			case <-producerDeliveryReportsChan:
+				i++
+			case <-timeoutChan:
+				// Note that producerDeliveryReportsChan must remain open: otherwise next delivery report will cause
+				// unhandled panic (and consequent process termination). Eventually it will be garbage collected.
+				//c.AbortWithStatus(http.StatusTooManyRequests)
+				logrus.WithError(err).Error("Kafka message producer timed out")
+				return
+			}
 		}
 	}
 }
