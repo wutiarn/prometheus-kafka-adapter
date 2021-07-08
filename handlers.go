@@ -98,7 +98,7 @@ func receiveHandler(
 			case <-timeoutChan:
 				// Note that producerDeliveryReportsChan must remain open: otherwise next delivery report will cause
 				// unhandled panic (and consequent process termination). Eventually it will be garbage collected.
-				//c.AbortWithStatus(http.StatusTooManyRequests)
+				c.AbortWithStatus(http.StatusInternalServerError)
 				logrus.WithError(err).Error("Kafka message producer timed out")
 				return
 			}
