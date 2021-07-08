@@ -15,6 +15,8 @@
 package main
 
 import (
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -28,6 +30,11 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/prometheus/prometheus/prompb"
 )
+
+var sentEventsCounter = promauto.NewCounter(prometheus.CounterOpts{
+	Name: "prometheus_kafka_adapter_events_sent_total",
+	Help: "The total number of events sent to kafka",
+})
 
 func receiveHandler(
 	producer *kafka.Producer,
@@ -95,6 +102,7 @@ func receiveHandler(
 			select {
 			case <-producerDeliveryReportsChan:
 				i++
+				sentEventsCounter.Inc()
 			case <-timeoutChan:
 				// Note that producerDeliveryReportsChan must remain open: otherwise next delivery report will cause
 				// unhandled panic (and consequent process termination). Eventually it will be garbage collected.
