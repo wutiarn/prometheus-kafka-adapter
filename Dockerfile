@@ -12,6 +12,8 @@ RUN go build -o /prometheus-kafka-adapter
 RUN go test ./...
 
 FROM ubuntu:20.04
+# librdkafka is pre-built for glibc-based distributions (like RedHat, Debian, CentOS, Ubuntu), and Alpine is musl-based.
+# See confluent-kafka-go README for details: https://github.com/confluentinc/confluent-kafka-go
 
 COPY schemas/metric.avsc /schemas/metric.avsc
 COPY --from=build /prometheus-kafka-adapter /
